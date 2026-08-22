@@ -1,0 +1,349 @@
+/* ==========================================================================
+   RAG Engine — custom Streamlit theme
+   Professional AI/SaaS dashboard aesthetic. No external frameworks.
+   ========================================================================== */
+
+:root {
+    --rag-bg: #0f1115;
+    --rag-surface: #171a21;
+    --rag-surface-2: #1e222b;
+    --rag-border: #2a2f3a;
+    --rag-text: #e6e8ec;
+    --rag-text-muted: #9aa1ac;
+    --rag-accent: #5b8def;
+    --rag-accent-soft: rgba(91, 141, 239, 0.14);
+    --rag-success: #3ecf8e;
+    --rag-success-soft: rgba(62, 207, 142, 0.14);
+    --rag-danger: #ef5b5b;
+    --rag-danger-soft: rgba(239, 91, 91, 0.12);
+    --rag-radius: 10px;
+    --rag-radius-lg: 14px;
+    --rag-shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+/* ---- App shell ---------------------------------------------------------- */
+
+.stApp {
+    background: var(--rag-bg);
+    color: var(--rag-text);
+}
+
+.block-container {
+    padding-top: 1.5rem;
+    padding-bottom: 3rem;
+    max-width: 920px;
+}
+
+html, body, [class*="css"] {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+}
+
+/* ---- Header -------------------------------------------------------------- */
+
+.app-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+    background: linear-gradient(180deg, var(--rag-surface) 0%, var(--rag-surface-2) 100%);
+    border: 1px solid var(--rag-border);
+    border-radius: var(--rag-radius-lg);
+    box-shadow: var(--rag-shadow);
+    flex-wrap: wrap;
+}
+
+.app-header-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--rag-text);
+    letter-spacing: -0.01em;
+}
+
+.app-header-icon {
+    font-size: 1.4rem;
+}
+
+.app-header-subtitle {
+    margin-top: 0.25rem;
+    font-size: 0.9rem;
+    color: var(--rag-text-muted);
+}
+
+.app-header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35rem;
+}
+
+.header-subbadge {
+    font-size: 0.78rem;
+    color: var(--rag-text-muted);
+}
+
+/* ---- Status badges -------------------------------------------------------- */
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.35rem 0.8rem;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+}
+
+.status-badge.status-online {
+    background: var(--rag-success-soft);
+    color: var(--rag-success);
+    border-color: rgba(62, 207, 142, 0.28);
+}
+
+.status-badge.status-offline {
+    background: var(--rag-danger-soft);
+    color: var(--rag-danger);
+    border-color: rgba(239, 91, 91, 0.28);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--rag-text-muted);
+    display: inline-block;
+}
+
+.status-dot.status-online {
+    background: var(--rag-success);
+    box-shadow: 0 0 0 3px var(--rag-success-soft);
+}
+
+.status-dot.status-offline {
+    background: var(--rag-danger);
+    box-shadow: 0 0 0 3px var(--rag-danger-soft);
+}
+
+.status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.88rem;
+    color: var(--rag-text);
+    margin: 0.3rem 0;
+}
+
+.status-error {
+    background: var(--rag-danger-soft);
+    color: var(--rag-danger);
+    border: 1px solid rgba(239, 91, 91, 0.28);
+    border-radius: var(--rag-radius);
+    padding: 0.6rem 0.8rem;
+    font-size: 0.85rem;
+    margin: 0.4rem 0;
+}
+
+/* ---- Chat ------------------------------------------------------------------ */
+
+.chat-heading {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--rag-text);
+    margin: 0.5rem 0 0.75rem 0;
+}
+
+[data-testid="stChatMessage"] {
+    background: var(--rag-surface);
+    border: 1px solid var(--rag-border);
+    border-radius: var(--rag-radius-lg);
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.6rem;
+}
+
+.answer-card {
+    background: var(--rag-surface-2);
+    border: 1px solid var(--rag-border);
+    border-left: 3px solid var(--rag-accent);
+    border-radius: var(--rag-radius);
+    padding: 0.9rem 1rem;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--rag-text);
+    margin-bottom: 0.6rem;
+}
+
+[data-testid="stChatInput"] textarea {
+    background: var(--rag-surface);
+    border-radius: var(--rag-radius);
+}
+
+/* ---- Sources ---------------------------------------------------------------- */
+
+.sources-heading {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--rag-text-muted);
+    margin: 0.75rem 0 0.4rem 0;
+}
+
+.source-card {
+    background: var(--rag-surface);
+    border: 1px solid var(--rag-border);
+    border-radius: var(--rag-radius);
+    padding: 0.6rem 0.85rem;
+    margin-bottom: 0.35rem;
+}
+
+.source-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: 0.87rem;
+}
+
+.source-icon {
+    font-size: 0.95rem;
+}
+
+.source-filename {
+    font-weight: 600;
+    color: var(--rag-text);
+}
+
+.source-meta {
+    color: var(--rag-text-muted);
+    font-size: 0.8rem;
+}
+
+.source-content {
+    font-size: 0.87rem;
+    color: var(--rag-text-muted);
+    line-height: 1.5;
+}
+
+[data-testid="stExpander"] {
+    border: 1px solid var(--rag-border);
+    border-radius: var(--rag-radius);
+    background: var(--rag-surface);
+    margin-bottom: 0.6rem;
+}
+
+/* ---- Metrics ------------------------------------------------------------------ */
+
+.metrics-row {
+    margin: 0.5rem 0 0.75rem 0;
+}
+
+[data-testid="stMetric"] {
+    background: var(--rag-surface);
+    border: 1px solid var(--rag-border);
+    border-radius: var(--rag-radius);
+    padding: 0.6rem 0.75rem;
+}
+
+[data-testid="stMetricLabel"] {
+    color: var(--rag-text-muted);
+}
+
+[data-testid="stMetricValue"] {
+    color: var(--rag-text);
+}
+
+/* ---- Sidebar -------------------------------------------------------------------- */
+
+[data-testid="stSidebar"] {
+    background: var(--rag-surface);
+    border-right: 1px solid var(--rag-border);
+}
+
+.sidebar-section-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--rag-text-muted);
+    margin: 0.5rem 0 0.4rem 0;
+}
+
+.sidebar-subsection-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--rag-text-muted);
+    margin-top: 0.6rem;
+}
+
+.sidebar-stat {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--rag-text);
+}
+
+.upload-filename {
+    font-size: 0.85rem;
+    color: var(--rag-text);
+    background: var(--rag-surface-2);
+    border: 1px solid var(--rag-border);
+    border-radius: var(--rag-radius);
+    padding: 0.4rem 0.6rem;
+    margin: 0.4rem 0;
+}
+
+/* ---- Buttons & inputs -------------------------------------------------------------- */
+
+.stButton > button {
+    border-radius: var(--rag-radius);
+    border: 1px solid var(--rag-border);
+    background: var(--rag-surface-2);
+    color: var(--rag-text);
+    font-weight: 600;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.stButton > button:hover {
+    border-color: var(--rag-accent);
+    background: var(--rag-accent-soft);
+    color: var(--rag-accent);
+}
+
+.stButton > button[kind="primary"] {
+    background: var(--rag-accent);
+    border-color: var(--rag-accent);
+    color: #fff;
+}
+
+.stButton > button[kind="primary"]:hover {
+    filter: brightness(1.08);
+}
+
+[data-testid="stFileUploader"] {
+    border-radius: var(--rag-radius);
+}
+
+.stSlider {
+    padding-top: 0.25rem;
+}
+
+/* ---- Misc ------------------------------------------------------------------------- */
+
+hr, [data-testid="stDivider"] {
+    border-color: var(--rag-border);
+}
+
+@media (max-width: 768px) {
+    .app-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .app-header-right {
+        align-items: flex-start;
+    }
+}

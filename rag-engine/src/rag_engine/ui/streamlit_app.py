@@ -1,54 +1,56 @@
+"""RAG Engine — Streamlit application entry point.
+
+Orchestrates the UI: page config, custom styling, session state, and
+the header / sidebar / chat components. All API communication logic
+lives in the individual components; this file only wires them together.
+"""
+
+from __future__ import annotations
+
 from pathlib import Path
 
-import requests
 import streamlit as st
 
+from rag_engine.ui.components.chat import render_chat
+from rag_engine.ui.components.header import render_header
+from rag_engine.ui.components.sidebar import render_sidebar
 
-API_BASE = "http://127.0.0.1:8000"
-
-
-def save_uploaded_pdf(uploaded_file) -> Path:
-    uploads_dir = Path("uploads")
-    uploads_dir.mkdir(parents=True, exist_ok=True)
-    output = uploads_dir / uploaded_file.name
-    output.write_bytes(uploaded_file.getbuffer())
-    return output
+_CSS_PATH = Path(__file__).parent / "styles" / "custom.css"
 
 
-st.set_page_config(page_title="RAG Engine", page_icon="📄", layout="centered")
-st.title("RAG Engine")
-st.caption("Upload documents and ask grounded questions.")
+def _load_custom_css() -> None:
+    """Inject the custom stylesheet if it exists."""
+    if _CSS_PATH.exists():
+        css = _CSS_PATH.read_text(encoding="utf-8")
+        st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
-st.subheader("1) Ingest PDF")
-uploaded = st.file_uploader("Choose a PDF", type=["pdf"], accept_multiple_files=False)
-if uploaded is not None:
-    file_path = save_uploaded_pdf(uploaded)
-    if st.button("Ingest"):
-        response = requests.post(
-            f"{API_BASE}/documents/ingest",
-            json={"pdf_path": str(file_path.resolve()), "source_id": file_path.name},
-            timeout=120,
-        )
-        if response.ok:
-            st.success(f"Ingested {response.json().get('ingested', 0)} chunks")
-        else:
-            st.error(response.text)
 
-st.subheader("2) Query")
-question = st.text_input("Question")
-top_k = st.number_input("Top K", min_value=1, max_value=20, value=5, step=1)
-if st.button("Ask") and question.strip():
-    response = requests.post(
-        f"{API_BASE}/query",
-        json={"question": question.strip(), "top_k": int(top_k)},
-        timeout=120,
+def _init_session_state() -> None:
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+
+def main() -> None:
+    st.set_page_config(
+        page_title="RAG Engine",
+        page_icon="📄",
+        layout="wide",
+        initial_sidebar_state="expanded",
     )
-    if response.ok:
-        data = response.json()
-        st.write(data.get("answer", ""))
-        if data.get("sources"):
-            st.caption("Sources")
-            for source in data["sources"]:
-                st.write(f"- {source}")
-    else:
-        st.error(response.text)
+
+    _load_custom_css()
+    _init_session_state()
+
+    settings = render_sidebar()
+
+    render_header(api_status=settings["api_connected"], health=settings["health"])
+
+    render_chat(
+        top_k=settings["top_k"],
+        similarity_threshold=settings["similarity_threshold"],
+        api_connected=settings["api_connected"],
+    )
+
+
+if __name__ == "__main__":
+    main()

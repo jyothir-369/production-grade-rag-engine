@@ -11,14 +11,17 @@ import hashlib
 import re
 
 
-load_dotenv()
+load_dotenv(override=True)
 
 
 # ============================================================
 # CONFIGURATION
 # ============================================================
 
-EMBED_PROVIDER = os.getenv("EMBED_PROVIDER", "gemini").lower()
+EMBED_PROVIDER = os.getenv(
+    "EMBED_PROVIDER",
+    "gemini",
+).lower()
 
 EMBED_MODEL = os.getenv(
     "EMBED_MODEL",
@@ -27,7 +30,7 @@ EMBED_MODEL = os.getenv(
 
 GEMINI_EMBED_MODEL = os.getenv(
     "GEMINI_EMBED_MODEL",
-    "gemini-embedding-2",
+    "gemini-embedding-001",
 )
 
 OLLAMA_BASE_URL = os.getenv(
@@ -62,7 +65,7 @@ def _ollama_headers() -> dict[str, str]:
 
 def _default_embed_dim(provider: str) -> int:
     if provider == "gemini":
-        return 768
+        return 3072
 
     if provider == "ollama":
         return 768
@@ -157,7 +160,6 @@ def _hash_embedding(
     ).digest()
 
     out: list[float] = []
-
     counter = 0
 
     while len(out) < dim:
@@ -190,8 +192,8 @@ def _hash_embedding(
 # ============================================================
 
 splitter = SentenceSplitter(
-    chunk_size=1000,
-    chunk_overlap=200,
+    chunk_size=350,
+    chunk_overlap=50,
 )
 
 
@@ -210,8 +212,8 @@ def _normalize_pdf_text(text: str) -> str:
         .replace("\ufeff", " ")
     )
 
-    # Fix PDF text where individual characters are
-    # separated by spaces.
+    # Fix PDF text where individual characters
+    # are separated by spaces.
     cleaned = re.sub(
         r"\b(?:[A-Za-z]\s+){2,}[A-Za-z]\b",
         lambda m: m.group(0).replace(" ", ""),
@@ -239,7 +241,7 @@ def _normalize_pdf_text(text: str) -> str:
 # LOAD AND CHUNK PDF
 # ============================================================
 
-def load_and_chunk_pdf(path: str):
+def load_and_chunk_pdf(path: str) -> list[str]:
 
     docs = PDFReader().load_data(
         file=path
@@ -251,9 +253,12 @@ def load_and_chunk_pdf(path: str):
         if getattr(d, "text", None)
     ]
 
-    chunks = []
+    chunks: list[str] = []
 
     for text in texts:
+
+        if not text:
+            continue
 
         chunks.extend(
             splitter.split_text(text)
@@ -281,6 +286,7 @@ def embed_texts(
         dim,
     ) = _get_embed_config()
 
+
     # ========================================================
     # OPENAI
     # ========================================================
@@ -297,6 +303,7 @@ def embed_texts(
             for item in response.data
         ]
 
+
     # ========================================================
     # GEMINI
     # ========================================================
@@ -304,7 +311,6 @@ def embed_texts(
     if provider == "gemini":
 
         try:
-
             from google import genai
             from google.genai import types
 
@@ -316,6 +322,7 @@ def embed_texts(
                 "Install it with: "
                 "python -m pip install -U google-genai"
             ) from exc
+
 
         api_key = (
             os.getenv("GEMINI_API_KEY")
@@ -330,9 +337,11 @@ def embed_texts(
                 "EMBED_PROVIDER=gemini"
             )
 
+
         client = genai.Client(
             api_key=api_key
         )
+
 
         try:
 
@@ -351,16 +360,35 @@ def embed_texts(
                 f"Gemini embedding request failed: {exc}"
             ) from exc
 
+
         if not result.embeddings:
 
             raise RuntimeError(
                 "Gemini returned no embeddings."
             )
 
-        return [
+
+        vectors = [
             embedding.values
             for embedding in result.embeddings
         ]
+
+
+        # Validate embedding dimensions before
+        # sending vectors to Qdrant.
+        for index, vector in enumerate(vectors):
+
+            if len(vector) != dim:
+
+                raise RuntimeError(
+                    "Gemini returned an unexpected "
+                    f"embedding dimension for item {index}: "
+                    f"expected {dim}, got {len(vector)}"
+                )
+
+
+        return vectors
+
 
     # ========================================================
     # OLLAMA
@@ -391,6 +419,7 @@ def embed_texts(
                 )
 
                 if not embedding:
+
                     raise RuntimeError(
                         "Ollama returned an empty embedding."
                     )
@@ -413,6 +442,7 @@ def embed_texts(
 
         return vectors
 
+
     # ========================================================
     # LOCAL HASH FALLBACK
     # ========================================================
@@ -426,6 +456,7 @@ def embed_texts(
             )
             for text in texts
         ]
+
 
     # ========================================================
     # INVALID PROVIDER

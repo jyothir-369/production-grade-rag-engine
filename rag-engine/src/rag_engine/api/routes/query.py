@@ -1,21 +1,41 @@
 from fastapi import APIRouter, HTTPException
-from rag_engine.models.schemas import QueryRequest, QueryResponse
-from rag_engine.core.rag_chain import rag_chain
-from rag_engine.core.vector_store import VectorStoreError
-from rag_engine.utils.logger import get_logger
+
+from rag_engine.core.rag_chain import (
+    RAGChain,
+)
+from rag_engine.core.vector_store import (
+    VectorStoreError,
+)
+from rag_engine.models.schemas import (
+    QueryRequest,
+    RAGQueryResult,
+)
+
 
 router = APIRouter()
-logger = get_logger(__name__)
+
+chain = RAGChain()
 
 
-@router.post("/query", response_model=QueryResponse)
-async def query_documents(request: QueryRequest):
+@router.post(
+    "/query",
+    response_model=RAGQueryResult,
+)
+def query_documents(
+    request: QueryRequest,
+) -> RAGQueryResult:
+
     try:
-        response = rag_chain.query(request)
-        return response
-    except VectorStoreError as e:
-        logger.error(f"Vector store error: {e}")
-        raise HTTPException(status_code=503, detail=str(e))
-    except Exception as e:
-        logger.error(f"Query failed: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        return chain.query(request)
+
+    except VectorStoreError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=str(exc),
+        ) from exc
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc),
+        ) from exc

@@ -1,40 +1,34 @@
 import time
 from typing import Optional
 
-from langchain_qdrant import QdrantVectorStore
-from langchain_openai import OpenAIEmbeddings
-from langchain_core.documents import Document
 from qdrant_client import QdrantClient
-from qdrant_client.http.exceptions import UnexpectedResponse
+from qdrant_client.models import PointStruct
 
 from rag_engine.config import settings
+from rag_engine.core.embeddings import embed_texts
 from rag_engine.utils.logger import get_logger
+
 
 logger = get_logger(__name__)
 
 
 class VectorStoreError(Exception):
     """Raised when vector store operations fail."""
-    pass
 
 
 class VectorStoreManager:
     """
-    Manages Qdrant vector store lifecycle.
+    Qdrant Cloud vector store.
 
-    Design decisions:
-    - Lazy initialization: don't connect until first use
-    - Health check method: used by /health endpoint
-    - Explicit error wrapping: never leak Qdrant internals to API layer
+    Uses the same:
+        Gemini embeddings
+        3072 dimensions
+        Qdrant collection
+        as the existing working RAG implementation.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._client: Optional[QdrantClient] = None
-        self._vector_store: Optional[QdrantVectorStore] = None
-        self._embeddings = OpenAIEmbeddings(
-            model=settings.embedding_model,
-            openai_api_key=settings.openai_api_key,
-        )
 
     @property
     def client(self) -> QdrantClient:
@@ -43,105 +37,241 @@ class VectorStoreManager:
                 self._client = QdrantClient(
                     url=settings.qdrant_url,
                     api_key=settings.qdrant_api_key,
-                    timeout=10,
+                    timeout=30,
                 )
-                logger.info(f"Connected to Qdrant at {settings.qdrant_url}")
-            except Exception as e:
-                raise VectorStoreError(f"Failed to connect to Qdrant: {e}")
+
+                self._client.get_collections()
+
+                logger.info(
+                    "Connected to Qdrant Cloud."
+                )
+
+            except Exception as exc:
+                logger.error(
+                    f"Qdrant connection failed: {exc}"
+                )
+
+                raise VectorStoreError(
+                    f"Failed to connect to Qdrant: {exc}"
+                ) from exc
+
         return self._client
 
-    @property
-    def store(self) -> QdrantVectorStore:
-        if self._vector_store is None:
-            self._vector_store = QdrantVectorStore(
-                client=self.client,
-                collection_name=settings.qdrant_collection_name,
-                embedding=self._embeddings,
-            )
-        return self._vector_store
+    # ============================================================
+    # HEALTH
+    # ============================================================
 
     def health_check(self) -> dict:
-        """Check Qdrant connectivity and collection status."""
         try:
             collections = self.client.get_collections()
-            collection_names = [c.name for c in collections.collections]
 
-            doc_count = 0
-            if settings.qdrant_collection_name in collection_names:
+            names = [
+                collection.name
+                for collection in collections.collections
+            ]
+
+            exists = (
+                settings.qdrant_collection_name
+                in names
+            )
+
+            count = 0
+
+            if exists:
                 info = self.client.get_collection(
                     settings.qdrant_collection_name
                 )
-                doc_count = info.points_count or 0
+
+                count = info.points_count or 0
 
             return {
                 "connected": True,
-                "documents_indexed": doc_count,
-                "collection_exists": (
-                    settings.qdrant_collection_name in collection_names
-                ),
+                "collection_exists": exists,
+                "documents_indexed": count,
             }
-        except Exception as e:
-            logger.error(f"Qdrant health check failed: {e}")
-            return {"connected": False, "error": str(e)}
+
+        except Exception as exc:
+            logger.error(
+                f"Qdrant health check failed: {exc}"
+            )
+
+            return {
+                "connected": False,
+                "collection_exists": False,
+                "documents_indexed": 0,
+                "error": str(exc),
+            }
+
+    # ============================================================
+    # INDEX
+    # ============================================================
 
     def index_documents(
-        self, chunks: list[Document]
+        self,
+        chunks,
     ) -> tuple[list[str], float]:
-        """
-        Index document chunks into Qdrant.
 
-        Returns:
-            Tuple of (document_ids, indexing_time_ms)
-        """
         start = time.perf_counter()
 
         try:
-            ids = self.store.add_documents(chunks)
-            elapsed_ms = (time.perf_counter() - start) * 1000
-            logger.info(
-                f"Indexed {len(chunks)} chunks in {elapsed_ms:.1f}ms"
+            texts = [
+                chunk.page_content
+                for chunk in chunks
+            ]
+
+            vectors = embed_texts(
+                texts,
+                task_type="RETRIEVAL_DOCUMENT",
             )
+
+            ids: list[str] = []
+
+            points = []
+
+            for index, (chunk, vector) in enumerate(
+                zip(chunks, vectors)
+            ):
+                source = chunk.metadata.get(
+                    "source_filename",
+                    "unknown",
+                )
+
+                chunk_index = chunk.metadata.get(
+                    "chunk_index",
+                    index,
+                )
+
+                import uuid
+
+                point_id = str(
+                    uuid.uuid5(
+                        uuid.NAMESPACE_URL,
+                        f"{source}:{chunk_index}",
+                    )
+                )
+
+                ids.append(point_id)
+
+                payload = {
+                    "text": chunk.page_content,
+                    "source": source,
+                    "chunk_index": chunk_index,
+                    **chunk.metadata,
+                }
+
+                points.append(
+                    PointStruct(
+                        id=point_id,
+                        vector=vector,
+                        payload=payload,
+                    )
+                )
+
+            self.client.upsert(
+                collection_name=(
+                    settings.qdrant_collection_name
+                ),
+                points=points,
+                wait=True,
+            )
+
+            elapsed_ms = (
+                time.perf_counter() - start
+            ) * 1000
+
+            logger.info(
+                f"Indexed {len(points)} chunks "
+                f"in {elapsed_ms:.1f}ms"
+            )
+
             return ids, elapsed_ms
-        except Exception as e:
-            logger.error(f"Indexing failed: {e}")
-            raise VectorStoreError(f"Failed to index documents: {e}")
+
+        except Exception as exc:
+            logger.error(
+                f"Indexing failed: {exc}"
+            )
+
+            raise VectorStoreError(
+                f"Failed to index documents: {exc}"
+            ) from exc
+
+    # ============================================================
+    # SEARCH
+    # ============================================================
 
     def search(
         self,
         query: str,
-        top_k: int = settings.retrieval_top_k,
-        score_threshold: float = settings.similarity_threshold,
-    ) -> list[tuple[Document, float]]:
-        """
-        Search for similar documents with scores.
+        top_k: int | None = None,
+        score_threshold: float | None = None,
+    ) -> list[tuple[dict, float]]:
 
-        Returns:
-            List of (document, similarity_score) tuples
-        """
         start = time.perf_counter()
 
+        top_k = (
+            top_k
+            if top_k is not None
+            else settings.retrieval_top_k
+        )
+
+        score_threshold = (
+            score_threshold
+            if score_threshold is not None
+            else settings.similarity_threshold
+        )
+
         try:
-            results = self.store.similarity_search_with_score(
-                query, k=top_k
+            query_vector = embed_texts(
+                [query],
+                task_type="RETRIEVAL_QUERY",
+            )[0]
+
+            response = self.client.query_points(
+                collection_name=(
+                    settings.qdrant_collection_name
+                ),
+                query=query_vector,
+                with_payload=True,
+                limit=top_k,
+                score_threshold=score_threshold,
             )
 
-            # Filter by threshold
-            filtered = [
-                (doc, score) for doc, score in results
-                if score >= score_threshold
-            ]
+            results = []
 
-            elapsed_ms = (time.perf_counter() - start) * 1000
+            for point in response.points:
+
+                payload = (
+                    point.payload
+                    or {}
+                )
+
+                results.append(
+                    (
+                        payload,
+                        float(point.score),
+                    )
+                )
+
+            elapsed_ms = (
+                time.perf_counter() - start
+            ) * 1000
+
             logger.info(
-                f"Search returned {len(filtered)}/{len(results)} results "
-                f"(threshold={score_threshold}) in {elapsed_ms:.1f}ms"
+                f"Search returned "
+                f"{len(results)} results "
+                f"in {elapsed_ms:.1f}ms"
             )
 
-            return filtered
-        except Exception as e:
-            logger.error(f"Search failed: {e}")
-            raise VectorStoreError(f"Search failed: {e}")
+            return results
+
+        except Exception as exc:
+            logger.error(
+                f"Search failed: {exc}"
+            )
+
+            raise VectorStoreError(
+                f"Search failed: {exc}"
+            ) from exc
 
 
-# Singleton
 vector_store_manager = VectorStoreManager()
