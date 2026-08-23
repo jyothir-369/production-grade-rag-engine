@@ -1,8 +1,11 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "rag-engine"
+name = "production-grade-rag"
 version = "0.1.0"
-description = "Production-style RAG engine with FastAPI and Streamlit"
-readme = "README.md"
+description = "Production-grade RAG engine"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.116.1",
@@ -13,26 +16,19 @@ dependencies = [
     "pydantic-settings>=2.10.0",
     "python-dotenv>=1.1.1",
     "qdrant-client>=1.15.1",
-    "langchain-community>=0.3.0",
     "requests>=2.32.5",
     "streamlit>=1.49.1",
     "uvicorn>=0.35.0",
+    "langchain-community>=0.3.0",
     "google-genai>=1.0.0"
 ]
 
-[project.optional-dependencies]
-dev = [
-    "httpx>=0.28.1",
-    "pytest>=8.4.1",
-    "ruff>=0.12.10",
+[tool.setuptools]
+py-modules = [
+    "main",
+    "data_loader",
+    "vector_db",
+    "streamlit_app",
+    "test_retrieval",
+    "custom_types"
 ]
-
-[tool.pytest.ini_options]
-pythonpath = ["src"]
-testpaths = ["tests"]
-
-[tool.ruff]
-line-length = 100
-
-[tool.ruff.lint]
-select = ["E", "F", "I"]
